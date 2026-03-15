@@ -1,4 +1,5 @@
 # गुप्तवार्ता · Guptavarta
+**World's first zero-setup, auto-encrypting Instagram DM extension.**
 
 > *असतो मा सद्गमय*
 > *Lead me from falsehood to truth.*
