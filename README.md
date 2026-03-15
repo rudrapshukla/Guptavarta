@@ -17,6 +17,8 @@ No accounts. No keys to manage. No setup. Just install and type.
 
 Meta removed E2E encryption from Instagram DMs. So I built it back. You're welcome, Zuckerberg.
 
+![Guptavarta Preview](thumbnail.png)
+
 ---
 
 ## How it works
