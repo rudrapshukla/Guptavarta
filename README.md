@@ -156,6 +156,17 @@ This is open source because privacy tools should be auditable. If you can read t
 [GitHub](https://github.com/rudrapshukla) · [Email](mailto:rudrapshukla@proton.me) · [Instagram](https://www.instagram.com/rudrapshukla/)
 
 
+## Support
+
+Guptavarta is free. Always will be.  
+But if it saved your privacy, chai is appreciated. ☕
+
+<img src="coffee.jpeg" width="300"/>
+
+**UPI:** `therealrudrashukla@okhdfcbank`  
+*₹99 — covers the Chrome Web Store listing*
+
+
 
 
 ---
