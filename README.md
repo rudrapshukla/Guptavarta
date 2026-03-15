@@ -47,7 +47,7 @@ Technically speaking:
 1. Download or clone this repo
 2. Go to `chrome://extensions`
 3. Enable **Developer Mode** (top right)
-4. Click **Load unpacked** → select the `guptavarta` folder inside the guptavarta-v1 folder
+4. Click **Load unpacked** → select the `guptavarta` folder
 5. Pin it. Open Instagram. Start a DM.
 
 ```bash
