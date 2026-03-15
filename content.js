@@ -80,13 +80,27 @@
     document.addEventListener("keydown", async (e) => {
       if (!isEnabled) return;             // toggle is OFF
       if (!isOnDMPage()) return;          // not a DM page — leave it alone, like she leave you alone.
+
+      // Block Shift+Enter when extension is ON — prevents multiline Lexical state
+      // that breaks encryption. Single line only when Guptavarta is active.
+      if (e.key === "Enter" && e.shiftKey && isEnabled && isOnDMPage()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
+
       if (e.key !== "Enter" || e.shiftKey || isSending) return;
 
       const input = getMessageInput();
       if (!input) return;
 
       const text = getText(input);
-      if (!text.trim() || text.startsWith(PREFIX)) return;
+      // Block empty/whitespace messages silently
+      if (!text.trim() || text.startsWith(PREFIX)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return;
+      }
 
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -94,7 +108,7 @@
       try {
         isSending = true;
         const encrypted = await encryptText(text);
-        setText(input, encrypted);
+        await setText(input, encrypted);
         await tick();
 
         const sent = clickSendButton();
@@ -134,29 +148,32 @@
   function scanMessages() {
     if (!isOnDMPage()) return;
 
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    const found  = [];
-    let node;
+    // Use element-level textContent instead of text nodes
+    // Lexical splits blobs across multiple text nodes — textContent reassembles them
+    const candidates = document.querySelectorAll(
+      'span[data-lexical-text="true"], span[dir="auto"], div[dir="auto"]'
+    );
 
-    while ((node = walker.nextNode())) {
-      const val = node.nodeValue || "";
-      const idx = val.indexOf(PREFIX);
-      if (idx === -1) continue;
+    for (const el of candidates) {
+      if (el.dataset.cg) continue;
 
-      const match = val.slice(idx).match(/^GPV:[A-Za-z0-9+/=]+/);
+      const text = (el.textContent || "").trim();
+      if (!text.startsWith(PREFIX)) continue;
+
+      // Stop at second GPV: — means two blobs are concatenated, take only first
+      const secondGPV = text.indexOf(PREFIX, PREFIX.length);
+      const cleaned   = secondGPV > -1 ? text.slice(0, secondGPV) : text;
+
+      // Extract valid base64 after prefix
+      const match = cleaned.match(/^GPV:[A-Za-z0-9+/]+=*/);
       if (!match) continue;
 
-      const parent = node.parentElement;
-      if (!parent || parent.dataset.cg) continue;
+      const blob = match[0];
+      if (blob.length < 30) continue; // too short to be real AES output
 
-      found.push({ parent, blob: match[0] });
-    }
-
-    for (const { parent, blob } of found) {
-      if (parent.dataset.cg) continue;
-      parent.dataset.cg    = "1";
-      parent.dataset.cgBlob = blob;
-      renderDecryptUI(parent, blob);
+      el.dataset.cg     = "1";
+      el.dataset.cgBlob = blob;
+      renderDecryptUI(el, blob);
     }
   }
 
@@ -233,28 +250,47 @@
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  // Instagram's textbox has role="textbox" but no aria-label
+  // Previous selector was missing it entirely — this is the multiline fix
   function getMessageInput() {
-    const el = document.activeElement;
-    if (!el) return null;
-    if (!el.isContentEditable && el.tagName !== "TEXTAREA") return null;
-    const hint = [
-      el.getAttribute("aria-label") || "",
-      el.getAttribute("aria-placeholder") || "",
-      el.getAttribute("placeholder") || "",
-    ].join(" ").toLowerCase();
-    if (/message|dm|direct/i.test(hint) || el.closest("form")) return el;
+    const boxes = document.querySelectorAll('[role="textbox"][contenteditable="true"]');
+    for (const box of boxes) {
+      if (box.offsetParent !== null) return box; // return first visible one
+    }
     return null;
   }
 
   function getText(el) {
-    return el.isContentEditable ? (el.innerText || "") : el.value;
+    if (el.isContentEditable) {
+      // Strip trailing newlines Shift+Enter adds
+      return (el.innerText || "").replace(/\n+$/, "").trim();
+    }
+    return el.value;
   }
 
-  function setText(el, text) {
+  async function setText(el, text) {
     el.focus();
+    await new Promise(r => setTimeout(r, 120));
     if (el.isContentEditable) {
+      // selectAll then insertText in one shot — replaces all selected content
+      // including multiline Lexical nodes, without a separate delete step
+      // that was leaving residual text before the encrypted blob
       document.execCommand("selectAll", false, null);
       document.execCommand("insertText", false, text);
+      await new Promise(r => setTimeout(r, 100));
+      // Verify the box actually contains ONLY our blob
+      // If residual text is still there, use a harder clear
+      const current = el.innerText || "";
+      if (!current.trim().startsWith(PREFIX)) {
+        // Hard clear — manually empty innerHTML then insert
+        el.innerHTML = "<p><br></p>";
+        el.focus();
+        await new Promise(r => setTimeout(r, 80));
+        document.execCommand("selectAll", false, null);
+        document.execCommand("insertText", false, text);
+        await new Promise(r => setTimeout(r, 80));
+      }
     } else {
       const proto = Object.getPrototypeOf(el);
       const desc  = Object.getOwnPropertyDescriptor(proto, "value");
@@ -264,7 +300,7 @@
     }
   }
 
-  function tick() { return new Promise(r => setTimeout(r, 80)); }
+  function tick() { return new Promise(r => setTimeout(r, 150)); }
 
   // ── Listen for toggle from popup via storage change ───────────────────────
   // Polling storage is more reliable than chrome.tabs.sendMessage
