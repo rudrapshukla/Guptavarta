@@ -1,0 +1,22 @@
+# OS garbage
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor settings
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Zip builds — don't commit these, build them locally
+*.zip
+*.crx
+*.pem
+
+# Logs
+*.log
+
+# Node (if you ever add a build step)
+node_modules/
+npm-debug.log*
